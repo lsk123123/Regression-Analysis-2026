@@ -52,8 +52,7 @@ def monte_carlo_simulation(n_samples: int = 100, rho: float = 0.0, n_simulations
     empirical_cov = np.cov(beta_hats.T) if len(beta_hats) > 0 else np.zeros((2, 2))
     
     # 计算理论协方差矩阵
-    X_with_bias = np.column_stack([np.ones(X.shape[0]), X])
-    theoretical_cov = (noise_std ** 2) * np.linalg.inv(X_with_bias.T @ X_with_bias)
+    theoretical_cov = (noise_std ** 2) * np.linalg.inv(X.T @ X)
     
     results = {
         'X': X,
