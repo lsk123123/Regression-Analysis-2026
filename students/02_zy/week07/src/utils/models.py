@@ -3,66 +3,24 @@ Module: utils.models
 Purpose: Core machine learning estimators.
 """
 import numpy as np
-from scipy import stats
 
 
 class AnalyticalOLS:
-    """
-    Analytical OLS regression model.
-    Supports fit, predict, score, and f_test.
-    """
-
     def __init__(self):
         self.coef_ = None
-        self.cov_matrix_ = None
-        self.sigma2_ = None
-        self.df_resid_ = None
-        self.residuals_ = None
-        self.fitted_values_ = None
 
     def fit(self, X: np.ndarray, y: np.ndarray):
-        n, p = X.shape
-        xtx = X.T @ X
-        xtx_inv = np.linalg.pinv(xtx)
-        self.coef_ = xtx_inv @ X.T @ y
-
-        self.fitted_values_ = X @ self.coef_
-        self.residuals_ = y - self.fitted_values_
-
-        rss = self.residuals_ @ self.residuals_
-        self.df_resid_ = n - p
-        self.sigma2_ = rss / self.df_resid_
-        self.cov_matrix_ = self.sigma2_ * xtx_inv
+        self.coef_ = np.linalg.solve(X.T @ X, X.T @ y)
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        if self.coef_ is None:
-            raise ValueError("Model is not fitted yet. Call fit() first.")
         return X @ self.coef_
 
     def score(self, X: np.ndarray, y: np.ndarray) -> float:
         y_pred = self.predict(X)
-        rss = np.sum((y - y_pred) ** 2)
-        tss = np.sum((y - np.mean(y)) ** 2)
-        return 1 - (rss / tss)
-
-    def f_test(self, C: np.ndarray, d: np.ndarray) -> dict:
-        if self.coef_ is None:
-            raise ValueError("Model is not fitted yet. Call fit() first.")
-
-        q = C.shape[0]
-        diff = C @ self.coef_ - d
-        cov_c = C @ self.cov_matrix_ @ C.T
-        cov_c_inv = np.linalg.inv(cov_c)
-        f_stat = (diff.T @ cov_c_inv @ diff) / q
-        p_value = 1 - stats.f.cdf(f_stat, q, self.df_resid_)
-
-        return {
-            "f_stat": f_stat,
-            "p_value": p_value,
-            "q": q,
-            "df_resid": self.df_resid_,
-        }
+        sse = np.sum((y - y_pred) ** 2)
+        sst = np.sum((y - np.mean(y)) ** 2)
+        return 1 - sse / sst
 
 
 class GradientDescentOLS:
@@ -82,13 +40,11 @@ class GradientDescentOLS:
 
         self.coef_ = None
         self.loss_history_ = []
-        self.full_loss_history_ = []
 
     def fit(self, X: np.ndarray, y: np.ndarray, seed: int = 42):
         n_samples, n_features = X.shape
         self.coef_ = np.zeros(n_features)
         self.loss_history_ = []
-        self.full_loss_history_ = []
 
         rng = np.random.default_rng(seed)
 
@@ -114,15 +70,12 @@ class GradientDescentOLS:
 
             self.coef_ -= self.learning_rate * gradient
 
-            updated_pred_batch = X_batch @ self.coef_
-            batch_mse = np.mean((y_batch - updated_pred_batch) ** 2)
             y_pred_full = X @ self.coef_
-            full_mse = np.mean((y - y_pred_full) ** 2)
-            self.loss_history_.append(batch_mse)
-            self.full_loss_history_.append(full_mse)
+            mse = np.mean((y - y_pred_full) ** 2)
+            self.loss_history_.append(mse)
 
             if epoch > 0:
-                delta = abs(self.full_loss_history_[-1] - self.full_loss_history_[-2])
+                delta = abs(self.loss_history_[-1] - self.loss_history_[-2])
                 if delta < self.tol:
                     break
 
