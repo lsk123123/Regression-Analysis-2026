@@ -1,6 +1,5 @@
 """
 模块：week07.main
-交叉验证、超参数调优、泛化能力分析（中文版）
 """
 import sys
 from pathlib import Path
@@ -12,7 +11,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 
-# 添加父目录到路径，以便导入 utils
 sys.path.append(str(Path(__file__).parent.parent))
 from utils.models import AnalyticalOLS, GradientDescentOLS
 
@@ -29,7 +27,7 @@ def add_intercept(X):
 
 def load_data():
     """
-    加载营销数据。自动定位数据文件路径，以便在 week07 目录下直接运行。
+    加载营销数据。
     """
     # 当前文件所在目录: .../students/19_lsk/src/week07/
     current_dir = Path(__file__).resolve().parent
@@ -37,7 +35,7 @@ def load_data():
     project_root = current_dir.parent.parent.parent.parent
     data_path = project_root / "homework" / "week06" / "data" / "q3_marketing.csv"
     if not data_path.exists():
-        # 备选：尝试相对路径（以 week07 为工作目录）
+        
         alt_path = current_dir / "../../../../homework/week06/_pycache_/q3_marketing.csv"
         if alt_path.exists():
             data_path = alt_path
@@ -99,13 +97,13 @@ def main():
     )
     print(f"\n数据划分: 训练 {X_train.shape[0]}, 验证 {X_val.shape[0]}, 测试 {X_test.shape[0]}")
 
-    # 标准化特征 (仅使用训练集)
+    # 标准化特征 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_val_scaled = scaler.transform(X_val)
     X_test_scaled = scaler.transform(X_test)
 
-    # 添加截距列 (标准化之后)
+    # 添加截距列
     X_train_scaled = add_intercept(X_train_scaled)
     X_val_scaled = add_intercept(X_val_scaled)
     X_test_scaled = add_intercept(X_test_scaled)
@@ -134,7 +132,7 @@ def main():
 
         # 判断是否发散（R² 为负无穷或极大）
         diverged = (val_r2 < 0) or np.isnan(val_r2) or np.isinf(val_rmse)
-        status = "❌ 发散" if diverged else "✅ 正常"
+        status = " 发散" if diverged else "正常"
 
         tuning_results.append({
             'lr': lr,
