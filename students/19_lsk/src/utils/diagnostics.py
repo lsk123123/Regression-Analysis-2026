@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from utils.models import AnalyticalOLS
+from .models import AnalyticalOLS
 
 
 def calculate_vif(X: np.ndarray) -> list:
