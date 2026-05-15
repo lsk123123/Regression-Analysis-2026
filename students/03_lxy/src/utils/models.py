@@ -23,7 +23,7 @@ class AnalyticalOLS:
     def fit(self, X: np.ndarray, y: np.ndarray):
         n, p = X.shape
         xtx = X.T @ X
-        xtx_inv = np.linalg.inv(xtx)
+        xtx_inv = np.linalg.pinv(xtx)
         self.coef_ = xtx_inv @ X.T @ y
 
         self.fitted_values_ = X @ self.coef_
