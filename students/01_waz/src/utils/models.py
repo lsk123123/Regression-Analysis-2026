@@ -6,6 +6,40 @@ import numpy as np
 from scipy import stats
 
 
+class CustomOLS:
+    """自定义OLS回归器 - 与AnalyticalOLS功能相同"""
+    
+    def __init__(self, fit_intercept=True):
+        self.fit_intercept = fit_intercept
+        self.coef_ = None
+        self.intercept_ = None
+        
+    def fit(self, X, y):
+        if self.fit_intercept:
+            X = np.column_stack([np.ones(X.shape[0]), X])
+        
+        try:
+            self.coef_ = np.linalg.solve(X.T @ X, X.T @ y)
+            if self.fit_intercept:
+                self.intercept_ = self.coef_[0]
+                self.coef_ = self.coef_[1:]
+        except np.linalg.LinAlgError:
+            self.coef_ = np.linalg.lstsq(X.T @ X, X.T @ y, rcond=None)[0]
+        
+        return self
+    
+    def predict(self, X):
+        if self.fit_intercept:
+            X = np.column_stack([np.ones(X.shape[0]), X])
+            return X @ np.concatenate([[self.intercept_], self.coef_])
+        return X @ self.coef_
+    
+    def score(self, X, y):
+        y_pred = self.predict(X)
+        sse = np.sum((y - y_pred) ** 2)
+        sst = np.sum((y - np.mean(y)) ** 2)
+        return 1 - (sse / sst) if sst != 0 else 0.0
+
 class AnalyticalOLS:
     """
     Analytical OLS regression model.

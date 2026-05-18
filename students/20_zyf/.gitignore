@@ -1,0 +1,21 @@
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# 结果/输出
+results/
+outputs/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+
+# 数据文件（如果需要）
+*.csv
+*.png
+*.jpg

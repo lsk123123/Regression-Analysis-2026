@@ -13,18 +13,20 @@ class AnalyticalOLS:
 
     def fit(self, X: np.ndarray, y: np.ndarray):
         """Fit the model using normal equation: beta = (X'X)^{-1}X'y"""
-        X = np.asarray(X)
-        y = np.asarray(y).reshape(-1, 1)
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
         self.coef_ = np.linalg.solve(X.T @ X, X.T @ y).flatten()
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make predictions."""
+        X = np.asarray(X, dtype=np.float64)
         return X @ self.coef_
 
     def score(self, X: np.ndarray, y: np.ndarray) -> float:
         """Calculate R-squared."""
-        y = np.asarray(y).reshape(-1)
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64).reshape(-1)
         y_pred = self.predict(X)
         sse = np.sum((y - y_pred) ** 2)
         sst = np.sum((y - np.mean(y)) ** 2)
@@ -53,11 +55,11 @@ class GradientDescentOLS:
 
     def fit(self, X: np.ndarray, y: np.ndarray, seed: int = 42):
         """Fit the model using gradient descent."""
-        X = np.asarray(X)
-        y = np.asarray(y).reshape(-1)
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64).reshape(-1)
         
         n_samples, n_features = X.shape
-        self.coef_ = np.zeros(n_features)
+        self.coef_ = np.zeros(n_features, dtype=np.float64)
         self.loss_history_ = []
 
         rng = np.random.default_rng(seed)
@@ -99,11 +101,13 @@ class GradientDescentOLS:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make predictions."""
+        X = np.asarray(X, dtype=np.float64)
         return X @ self.coef_
 
     def score(self, X: np.ndarray, y: np.ndarray) -> float:
         """Calculate R-squared."""
-        y = np.asarray(y).reshape(-1)
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64).reshape(-1)
         y_pred = self.predict(X)
         sse = np.sum((y - y_pred) ** 2)
         sst = np.sum((y - np.mean(y)) ** 2)
