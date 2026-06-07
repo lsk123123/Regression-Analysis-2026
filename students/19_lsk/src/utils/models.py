@@ -171,3 +171,276 @@ class GradientDescentOLS:
         sse = np.sum((y - y_pred) ** 2)
         sst = np.sum((y - np.mean(y)) ** 2)
         return 1 - sse / sst if sst != 0 else 0.0
+
+
+# ============================================================
+# 变量选择：前向选择 & 后向剔除（基于交叉验证）
+# ============================================================
+
+def forward_selection(
+    X: np.ndarray,
+    y: np.ndarray,
+    max_features: int = None,
+    cv_folds: int = 5,
+    scoring: str = "rmse",
+    verbose: bool = True,
+) -> tuple:
+    """
+    基于交叉验证的前向选择（Forward Selection）。
+
+    从空模型开始，每次添加一个对 CV 性能提升最大的特征，
+    直到达到 max_features 或无法再提升。
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n, p)
+        特征矩阵（不含截距列，函数内部会自动添加）
+    y : np.ndarray, shape (n,)
+        目标变量
+    max_features : int or None
+        最大选择特征数，None 表示最多选全部特征
+    cv_folds : int
+        交叉验证折数
+    scoring : str
+        评分方式: "rmse" 或 "r2"
+    verbose : bool
+        是否打印中间过程
+
+    Returns
+    -------
+    selected_indices : list
+        被选中特征的列索引
+    cv_scores_history : list
+        每一步的 CV 分数
+    """
+    n_samples, n_features = X.shape
+    if max_features is None:
+        max_features = n_features
+
+    remaining = list(range(n_features))
+    selected = []
+    best_cv_score = np.inf if scoring == "rmse" else -np.inf
+    cv_scores_history = []
+
+    # 手动 K-Fold 划分
+    indices = np.arange(n_samples)
+    np.random.seed(42)
+    np.random.shuffle(indices)
+    fold_size = n_samples // cv_folds
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"前向选择 (Forward Selection) - max_features={max_features}")
+        print(f"{'='*60}")
+
+    for step in range(max_features):
+        best_feature = None
+        best_feature_score = np.inf if scoring == "rmse" else -np.inf
+
+        for feat in remaining:
+            candidate_features = selected + [feat]
+            X_candidate = X[:, candidate_features]
+
+            # 交叉验证
+            cv_scores = []
+            for fold in range(cv_folds):
+                val_start = fold * fold_size
+                val_end = (fold + 1) * fold_size if fold < cv_folds - 1 else n_samples
+                val_idx = indices[val_start:val_end]
+                train_idx = np.concatenate([indices[:val_start], indices[val_end:]])
+
+                X_train, y_train = X_candidate[train_idx], y[train_idx]
+                X_val, y_val = X_candidate[val_idx], y[val_idx]
+
+                # 添加截距列
+                X_train_c = np.column_stack([np.ones(X_train.shape[0]), X_train])
+                X_val_c = np.column_stack([np.ones(X_val.shape[0]), X_val])
+
+                try:
+                    model = AnalyticalOLS()
+                    model.fit(X_train_c, y_train)
+                    y_pred = model.predict(X_val_c)
+                    if scoring == "rmse":
+                        score = np.sqrt(np.mean((y_val - y_pred) ** 2))
+                    else:
+                        sse = np.sum((y_val - y_pred) ** 2)
+                        sst = np.sum((y_val - np.mean(y_val)) ** 2)
+                        score = 1 - sse / sst if sst != 0 else 0.0
+                    cv_scores.append(score)
+                except np.linalg.LinAlgError:
+                    cv_scores.append(np.inf if scoring == "rmse" else -np.inf)
+
+            avg_score = np.mean(cv_scores)
+
+            if scoring == "rmse":
+                if avg_score < best_feature_score:
+                    best_feature_score = avg_score
+                    best_feature = feat
+            else:
+                if avg_score > best_feature_score:
+                    best_feature_score = avg_score
+                    best_feature = feat
+
+        # 检查是否有提升
+        improved = False
+        if scoring == "rmse":
+            if best_feature_score < best_cv_score:
+                improved = True
+        else:
+            if best_feature_score > best_cv_score:
+                improved = True
+
+        if best_feature is not None and improved:
+            selected.append(best_feature)
+            remaining.remove(best_feature)
+            best_cv_score = best_feature_score
+            cv_scores_history.append(best_cv_score)
+            if verbose:
+                print(f"  Step {step+1}: 添加特征 {best_feature}, CV {scoring.upper()}={best_feature_score:.6f}")
+        else:
+            if verbose:
+                print(f"  Step {step+1}: 无法再提升，停止选择")
+            break
+
+    if verbose:
+        print(f"  最终选中特征: {selected}")
+        print(f"{'='*60}\n")
+
+    return selected, cv_scores_history
+
+
+def backward_elimination(
+    X: np.ndarray,
+    y: np.ndarray,
+    min_features: int = 1,
+    cv_folds: int = 5,
+    scoring: str = "rmse",
+    verbose: bool = True,
+) -> tuple:
+    """
+    基于交叉验证的后向剔除（Backward Elimination）。
+
+    从全模型开始，每次删除一个对 CV 性能影响最小（或删除后性能最好）的特征，
+    直到达到 min_features。
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n, p)
+        特征矩阵（不含截距列，函数内部会自动添加）
+    y : np.ndarray, shape (n,)
+        目标变量
+    min_features : int
+        最少保留的特征数
+    cv_folds : int
+        交叉验证折数
+    scoring : str
+        评分方式: "rmse" 或 "r2"
+    verbose : bool
+        是否打印中间过程
+
+    Returns
+    -------
+    selected_indices : list
+        被保留特征的列索引
+    cv_scores_history : list
+        每一步的 CV 分数
+    """
+    n_samples, n_features = X.shape
+
+    selected = list(range(n_features))
+    cv_scores_history = []
+
+    # 手动 K-Fold 划分
+    indices = np.arange(n_samples)
+    np.random.seed(42)
+    np.random.shuffle(indices)
+    fold_size = n_samples // cv_folds
+
+    # 评估全模型
+    X_full = X[:, selected]
+    full_cv_scores = []
+    for fold in range(cv_folds):
+        val_start = fold * fold_size
+        val_end = (fold + 1) * fold_size if fold < cv_folds - 1 else n_samples
+        val_idx = indices[val_start:val_end]
+        train_idx = np.concatenate([indices[:val_start], indices[val_end:]])
+        X_train_c = np.column_stack([np.ones(len(train_idx)), X_full[train_idx]])
+        X_val_c = np.column_stack([np.ones(len(val_idx)), X_full[val_idx]])
+        try:
+            model = AnalyticalOLS()
+            model.fit(X_train_c, y[train_idx])
+            y_pred = model.predict(X_val_c)
+            if scoring == "rmse":
+                full_cv_scores.append(np.sqrt(np.mean((y[val_idx] - y_pred) ** 2)))
+            else:
+                sse = np.sum((y[val_idx] - y_pred) ** 2)
+                sst = np.sum((y[val_idx] - np.mean(y[val_idx])) ** 2)
+                full_cv_scores.append(1 - sse / sst if sst != 0 else 0.0)
+        except np.linalg.LinAlgError:
+            full_cv_scores.append(np.inf if scoring == "rmse" else -np.inf)
+
+    current_best = np.mean(full_cv_scores)
+    cv_scores_history.append(current_best)
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"后向剔除 (Backward Elimination) - min_features={min_features}")
+        print(f"{'='*60}")
+        print(f"  Step 0 (全模型): {len(selected)} 特征, CV {scoring.upper()}={current_best:.6f}")
+
+    for step in range(n_features - min_features):
+        worst_feature = None
+        best_after_removal = np.inf if scoring == "rmse" else -np.inf
+
+        for feat in selected:
+            candidate_features = [f for f in selected if f != feat]
+            if len(candidate_features) == 0:
+                continue
+            X_candidate = X[:, candidate_features]
+
+            cv_scores = []
+            for fold in range(cv_folds):
+                val_start = fold * fold_size
+                val_end = (fold + 1) * fold_size if fold < cv_folds - 1 else n_samples
+                val_idx = indices[val_start:val_end]
+                train_idx = np.concatenate([indices[:val_start], indices[val_end:]])
+                X_train_c = np.column_stack([np.ones(len(train_idx)), X_candidate[train_idx]])
+                X_val_c = np.column_stack([np.ones(len(val_idx)), X_candidate[val_idx]])
+                try:
+                    model = AnalyticalOLS()
+                    model.fit(X_train_c, y[train_idx])
+                    y_pred = model.predict(X_val_c)
+                    if scoring == "rmse":
+                        cv_scores.append(np.sqrt(np.mean((y[val_idx] - y_pred) ** 2)))
+                    else:
+                        sse = np.sum((y[val_idx] - y_pred) ** 2)
+                        sst = np.sum((y[val_idx] - np.mean(y[val_idx])) ** 2)
+                        cv_scores.append(1 - sse / sst if sst != 0 else 0.0)
+                except np.linalg.LinAlgError:
+                    cv_scores.append(np.inf if scoring == "rmse" else -np.inf)
+
+            avg_score = np.mean(cv_scores)
+
+            if scoring == "rmse":
+                if avg_score < best_after_removal:
+                    best_after_removal = avg_score
+                    worst_feature = feat
+            else:
+                if avg_score > best_after_removal:
+                    best_after_removal = avg_score
+                    worst_feature = feat
+
+        if worst_feature is not None:
+            selected.remove(worst_feature)
+            current_best = best_after_removal
+            cv_scores_history.append(current_best)
+            if verbose:
+                print(f"  Step {step+1}: 剔除特征 {worst_feature}, CV {scoring.upper()}={current_best:.6f}")
+        else:
+            break
+
+    if verbose:
+        print(f"  最终保留特征: {selected}")
+        print(f"{'='*60}\n")
+
+    return selected, cv_scores_history
