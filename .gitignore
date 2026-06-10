@@ -24,16 +24,14 @@
 
 **/*.npz
 
-<<<<<<< HEAD
-__pycache__/
-*.pyc
-*.pyo
-=======
 # Python 缓存文件
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
+# VS Code settings
+.vscode/
+
+# CSV data files
 students/*/data/*.csv
->>>>>>> 10bf3923d45e7309ac1fdc50de2343ced4e644fd
